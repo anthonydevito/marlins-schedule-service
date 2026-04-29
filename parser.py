@@ -37,8 +37,6 @@ def parse_schedule_data(raw_data: dict, team_ids: list, parent_club_cache: dict)
 
                 status_code = game.get("status", {}).get("statusCode")
                 game_state = "Not Started"
-
-                print("status code is here: ", status_code)
                 
                 ## confirm these letter codes
                 ## temporary but I think these codes map to:
@@ -48,16 +46,25 @@ def parse_schedule_data(raw_data: dict, team_ids: list, parent_club_cache: dict)
                 elif status_code in ["I", "D", "DI"]: # I = In Progress, D = Delayed
                     game_state = "In Progress"
 
-                ## get level from team data, default to regular season
-                team_record = game.get("teams", {}).get("away" if tracked_id == away_id else "home", {}).get("team", {})
-                level = team_record.get("springLeague", {}).get("name") if team_record.get("springLeague") else "Regular Season"
-                
-                # quick dict for the level integers
-                sport_id_to_level = {
-                    1: "MLB", 11: "Triple-A", 12: "Double-A", 13: "High-A", 14: "Single-A", 16: "Rookie", 21: "Minor League Baseball"
+
+                ## initially had a dynamic cache for these levels
+                ## but figured hard-coding would be best if we're only hitting 11 teams
+                ## on a larger scale application, dynamically caching on startup would be the best option here
+                team_id_to_level = {
+                    "146": "MLB", # Miami Marlins
+                    "564": "Triple-A", # Jacksonville Jumbo Shrimp
+                    "4124": "Double-A", # Pensacola Blue Wahoos
+                    "554": "High-A", # Beloit Sky Carp
+                    "479": "Single-A", # Jupiter Hammerheads
+                    "467": "Rookie", # FCL Marlins
+                    "619": "Rookie", # DSL Marlins
+                    "2127": "Rookie", # DSL Miami
+                    "385": "Minor League Baseball", # Marlins Prospects
+                    "3276": "Minor League Baseball", # Alternate Site
+                    "3277": "Minor League Baseball" # Organization
                 }
                 
-                level_str = "MLB/MiLB" # quick placeholder, can try and grab from team name
+                level_str = team_id_to_level.get(tracked_id, "Unknown Level")
 
                 game_info = {
                     "teamName": our_team_name,
