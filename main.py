@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 MARLINS_TEAM_ID = 146
 MLB_API_BASE_URL = "https://statsapi.mlb.com/api/v1"
 
-### cache for team IDs, with Marlins as default
-TEAM_IDS_CACHE = [str(MARLINS_TEAM_ID)]
+### cache for team IDs & sport IDs
+TEAM_IDS_CACHE = [str(MARLINS_TEAM_ID)] # marlins as default
+SPORT_IDS_CACHE = {"1"} # mlb as default
 
-
-### fetches the current affiliate team IDs for the Marlins
+### fetches the current affiliate team IDs & sport IDs for the Marlins
 async def fetch_affiliate_ids() -> list:
 
     url = f"{MLB_API_BASE_URL}/teams/affiliates"
@@ -36,15 +36,19 @@ async def fetch_affiliate_ids() -> list:
             teams = data.get("teams", []) # get the teams ids
             for team in teams:
                 team_id = team.get("id")
+                sport_id = team.get("sport", {}).get("id")
 
                 if team_id and team_id != MARLINS_TEAM_ID:
                     affiliate_ids.append(str(team_id)) # add affiliates to Marlins from cache
+
+                if sport_id:
+                    SPORT_IDS_CACHE.add(str(sport_id))
                     
-            logger.info(f"Successfully loaded {len(affiliate_ids)} affiliate IDs")
+            logger.info(f"Successfully loaded {len(affiliate_ids)} affiliate IDs across {len(SPORT_IDS_CACHE)} sport levels")
             return affiliate_ids
             
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to fetch affiliates from Stats API: {e}")
+        except httpx.HTTPError as error:
+            logger.error(f"Failed hitting affiliates API: {url} - {error}")
             return [] # return empty array upon failure
 
 
@@ -73,19 +77,39 @@ app = FastAPI(
 @app.get("/health")
 async def health_check():
 
-    return {"status": "we are good to go", "cached_team_count": len(TEAM_IDS_CACHE)}
+    return {
+        "status": "we are good to go", 
+        "cached_team_count": len(TEAM_IDS_CACHE),
+        "cached_sport_count": len(SPORT_IDS_CACHE)
+    }
+
+### quick helper to fetch raw schedule from MLB Stats API
+async def fetch_raw_schedule(target_date: date) -> dict:
+
+    url = f"{MLB_API_BASE_URL}/schedule"
+    params = {
+        "sportId": ",".join(SPORT_IDS_CACHE),
+        "teamId": ",".join(TEAM_IDS_CACHE),
+        "date": target_date.strftime("%Y-%m-%d")
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as error:
+            logger.error(f"Failed to fetch schedule data for {target_date}: {error}")
+            return {}
 
 
-### will fetch schedule for Marlins & all of its affiliates
-### if no date provided, use today's YYYY-MM-DD as default
-### returns target_date and teams to query
+### main endpoint
 @app.get("/schedule")
 async def get_schedule(target_date: date = None):
 
     if not target_date:
         target_date = date.today()
+
+    raw_schedule_data = await fetch_raw_schedule(target_date)
         
-    return {
-        "target_date": target_date,
-        "team_ids_to_query": TEAM_IDS_CACHE
-    }
+    return raw_schedule_data # will parse later
