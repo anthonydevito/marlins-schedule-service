@@ -1,6 +1,6 @@
 ### converts the raw MLB Stats API data into a nicer game info for the schedule endpoint
 ### will return a list of objects, one for each requested team ID
-def parse_schedule_data(raw_data: dict, team_ids: list) -> list:
+def parse_schedule_data(raw_data: dict, team_ids: list, parent_club_cache: dict) -> list:
 
     results = {str(team_id): {} for team_id in team_ids} # starter dict
 
@@ -27,27 +27,43 @@ def parse_schedule_data(raw_data: dict, team_ids: list) -> list:
                 if tracked_id == away_id:
                     our_team_name = away_team.get("name")
                     opponent_name = home_team.get("name")
+                    opponent_id = home_id
                 else:
                     our_team_name = home_team.get("name")
                     opponent_name = away_team.get("name")
+                    opponent_id = away_id
+
+                opponent_parent = parent_club_cache.get(opponent_id, "Unknown MLB Affiliate") # get parent club from cache
 
                 status_code = game.get("status", {}).get("statusCode")
                 game_state = "Not Started"
 
                 print("status code is here: ", status_code)
                 
+                ## confirm these letter codes
                 ## temporary but I think these codes map to:
-                ## S = Scheduled, P = Pre-Game, F = Final, I = In Progress, O = Game Over (but not officially final)
+                ## F = Final, O = Game Over (but not officially final)
                 if status_code in ["F", "O"]:
                     game_state = "Completed"
-                elif status_code in ["I", "M", "MA"]: # M & MA = Manager challenge
+                elif status_code in ["I", "D", "DI"]: # I = In Progress, D = Delayed
                     game_state = "In Progress"
+
+                ## get level from team data, default to regular season
+                team_record = game.get("teams", {}).get("away" if tracked_id == away_id else "home", {}).get("team", {})
+                level = team_record.get("springLeague", {}).get("name") if team_record.get("springLeague") else "Regular Season"
+                
+                # quick dict for the level integers
+                sport_id_to_level = {
+                    1: "MLB", 11: "Triple-A", 12: "Double-A", 13: "High-A", 14: "Single-A", 16: "Rookie", 21: "Minor League Baseball"
+                }
+                
+                level_str = "MLB/MiLB" # quick placeholder, can try and grab from team name
 
                 game_info = {
                     "teamName": our_team_name,
-                    "level": game.get("gameType"), # returns integer.  needs to find map and convert maybe?
+                    "level": level_str,
                     "opponent": opponent_name,
-                    "opponentParentClub": "need to do this still", 
+                    "opponentParentClub": opponent_parent,
                     "state": game_state,
                     "venue": game.get("venue", {}).get("name")
                 }
@@ -55,7 +71,19 @@ def parse_schedule_data(raw_data: dict, team_ids: list) -> list:
                 ## add in state-dependent data
                 if game_state == "Not Started":
                     game_info["gameTime"] = game.get("gameDate")
-                    game_info["probablePitchers"] = "N/A" # look into this, maybe in base payload?
+                    
+                    ## extract starting pitchers
+                    away_pitcher = game.get("teams", {}).get("away", {}).get("probablePitcher", {}).get("fullName")
+                    home_pitcher = game.get("teams", {}).get("home", {}).get("probablePitcher", {}).get("fullName")
+
+                    if away_pitcher and home_pitcher:
+                         game_info["probablePitchers"] = f"{away_pitcher} vs {home_pitcher}"
+                    elif away_pitcher:
+                         game_info["probablePitchers"] = f"{away_pitcher} (Away) - Home TBD"
+                    elif home_pitcher:
+                         game_info["probablePitchers"] = f"Away TBD - {home_pitcher} (Home)"
+                    else:
+                         game_info["probablePitchers"] = "TBD"
                     
                 elif game_state == "Completed":
                     ## get final score for completed games
@@ -67,13 +95,35 @@ def parse_schedule_data(raw_data: dict, team_ids: list) -> list:
                     else:
                         game_info["finalScore"] = f"{our_team_name} {home_score} - {opponent_name} {away_score}"
                         
-                    # pitching decisions??  come back to
+                    decisions = game.get("decisions", {})
+
+                    game_info["winningPitcher"] = decisions.get("winner", {}).get("fullName", "Unknown")
+                    game_info["losingPitcher"] = decisions.get("loser", {}).get("fullName", "Unknown")
+                    
+                    if "save" in decisions:
+                        game_info["savePitcher"] = decisions.get("save", {}).get("fullName")
 
                 elif game_state == "In Progress":
                     away_score = game.get("teams", {}).get("away", {}).get("score", 0)
                     home_score = game.get("teams", {}).get("home", {}).get("score", 0)
                     game_info["currentScore"] = f"{away_score} - {home_score}"
-                    # might need more inputs to get things like current inning or outs....come back to
+                    
+                    ## extract linescore
+                    linescore = game.get("linescore", {})
+                    game_info["inning"] = f"{linescore.get('inningHalf', '')} {linescore.get('currentInningOrdinal', '')}"
+                    game_info["outs"] = linescore.get("outs")
+
+                    offense = linescore.get("offense", {})
+                    defense = linescore.get("defense", {})
+
+                    game_info["batterUp"] = offense.get("batter", {}).get("fullName", "Unknown")
+                    game_info["currentPitcher"] = defense.get("pitcher", {}).get("fullName", "Unknown")
+
+                    runners = []
+                    if "first" in offense: runners.append("1B")
+                    if "second" in offense: runners.append("2B")
+                    if "third" in offense: runners.append("3B")
+                    game_info["runnersOnBase"] = ", ".join(runners) if runners else "Bases Empty"
 
                 results[tracked_id] = game_info
 
