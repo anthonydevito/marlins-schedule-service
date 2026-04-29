@@ -20,27 +20,43 @@ A lightweight FastAPI abstraction layer that interfaces with the MLB Stats API t
 
 ## Local Setup
 
-1. **Clone or extract the repository:**
+1. ***Clone or extract the repository:***
    ```bash
    cd marlins-schedule-service
    ```
 
-2. **Install the required dependencies:**
-  ```bash
-  pip install -r requirements.txt
-  ```
+2. ***Set up virtual environment:***
 
-3. **Run the FastAPI server:**
-  ```bash
-  uvicorn main:app --reload
-  ```
+   If on Mac/Linux, run these two:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate 
+   ```
+   If on Windows, run these two:
+   ```bash
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+
+3. ***Install the required dependencies:***
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+5. ***Run the FastAPI server:***
+   ```bash
+   uvicorn main:app --reload
+   ```
 
 The server will start at http://127.0.0.1:8000. You will see startup logs indicating the affiliate and parent club caches have successfully loaded.
 
 
 ## Endpoints
 
-`GET /schedule`
+### `GET /health`
+A quick intro health check to confirm service is running and view team counts.
+
+### `GET /schedule`
 Fetches the schedule for the Marlins and all affiliates for a given date.
 
 Parameters:
@@ -50,6 +66,3 @@ Parameters:
 Example Request:
 
 [http://127.0.0.1:8000/schedule?target_date=2026-04-29](http://127.0.0.1:8000/schedule?target_date=2026-04-29)
-
-`GET /health`
-A quick intro health check to confirm service is running and view team counts.
