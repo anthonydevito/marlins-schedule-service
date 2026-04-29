@@ -3,6 +3,7 @@ from datetime import date
 import httpx
 import logging
 from contextlib import asynccontextmanager
+from parser import parse_schedule_data
 
 ### basic logging config
 logging.basicConfig(level=logging.INFO)
@@ -112,4 +113,6 @@ async def get_schedule(target_date: date = None):
 
     raw_schedule_data = await fetch_raw_schedule(target_date)
         
-    return raw_schedule_data # will parse later
+    parsed_data = parse_schedule_data(raw_schedule_data, TEAM_IDS_CACHE)
+
+    return parsed_data
