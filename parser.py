@@ -63,7 +63,7 @@ def parse_schedule_data(raw_data: dict, team_ids: list, parent_club_cache: dict)
                     "3276": "Minor League Baseball", # Alternate Site
                     "3277": "Minor League Baseball" # Organization
                 }
-                
+
                 level_str = team_id_to_level.get(tracked_id, "Unknown Level")
 
                 game_info = {
