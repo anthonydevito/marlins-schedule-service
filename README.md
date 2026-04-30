@@ -11,7 +11,7 @@ A lightweight FastAPI abstraction layer that interfaces with the MLB Stats API t
 ## Assumptions Made
 
 1.  **JSON Compliance:** The prompt requested a response where the team ID is the key for an object. But the keys have to be strings, so I structured the response as a list of objects containing a `team` (the ID) and `gameInfo` (the nested object).
-2.  **Level Mapping:** The `gameType` provided in the base schedule payload returns shortend strings (ex. "R" for Regular Season). To provide the specific league string requested (ex. "Triple-A"), I utilized a manual dictionary mapping based on the `sportId`.
+2.  **Level Mapping:** The `gameType` provided in the base schedule payload returns shortened strings (ex. "R" for Regular Season). To provide the specific league string requested (ex. "Triple-A"), I utilized a manual dictionary mapping based on the `sportId`.
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ A lightweight FastAPI abstraction layer that interfaces with the MLB Stats API t
    pip install -r requirements.txt
    ```
 
-5. ***Run the FastAPI server:***
+4. ***Run the FastAPI server:***
    ```bash
    uvicorn main:app --reload
    ```
